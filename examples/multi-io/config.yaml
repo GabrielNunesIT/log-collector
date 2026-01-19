@@ -1,0 +1,53 @@
+pipeline:
+  buffer_size: 1000
+  workers: 4
+  drop_on_full_buffer: true
+
+ingestors:
+  # Syslog Ingestor (UDP)
+  syslog:
+    enabled: true
+    protocol: udp
+    address: "0.0.0.0:5140"
+
+  # File Ingestor (Tailing shared volume)
+  file:
+    enabled: true
+    paths:
+      - "/var/log/input/*.log"
+    poll_interval: 1s
+
+emitters:
+  # Stdout (Debug)
+  stdout:
+    enabled: true
+    format: json
+
+  # Elasticsearch
+  elasticsearch:
+    enabled: true
+    addresses: 
+      - "http://elasticsearch:9200"
+    index: "collector-logs"
+    batch_size: 10
+    flush_interval: 1s
+
+  # Loki
+  loki:
+    enabled: true
+    url: "http://loki:3100"
+    batch_size: 10
+    flush_interval: 1s
+    labels:
+      job: "log-collector"
+      env: "example"
+
+  # VictoriaLogs
+  victorialogs:
+    enabled: true
+    url: "http://victorialogs:9428"
+    batch_size: 10
+    flush_interval: 1s
+    labels:
+      job: "log-collector"
+      env: "example"

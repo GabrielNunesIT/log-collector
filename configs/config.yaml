@@ -1,0 +1,98 @@
+# log-collector configuration
+# Load order: defaults -> this file -> environment (LOG_COLLECTOR_*) -> CLI flags
+
+loglevel: info
+
+pipeline:
+  buffersize: 1000
+  shutdowntimeout: 30s
+  droponbufferfull: false
+
+ingestors:
+  file:
+    enabled: false
+    paths:
+      - /var/log/*.log
+    exclude:
+      - "*.gz"
+    processor:
+      parser:
+        enabled: true
+        jsonautodetect: true
+        patterns: []
+      enricher:
+        enabled: true
+        addhostname: true
+        addtimestamp: true
+        staticlabels: {}
+
+  syslog:
+    enabled: false
+    protocol: udp
+    address: ":514"
+    processor:
+      parser:
+        enabled: true
+        jsonautodetect: false
+      enricher:
+        enabled: true
+        addhostname: true
+
+  journal:
+    enabled: false
+    units: []
+    processor:
+      parser:
+        enabled: true
+      enricher:
+        enabled: true
+        addhostname: true
+
+  stdin:
+    enabled: false
+    processor:
+      parser:
+        enabled: true
+        jsonautodetect: true
+      enricher:
+        enabled: true
+        addhostname: true
+        addtimestamp: true
+
+emitters:
+  stdout:
+    enabled: true
+    format: json
+
+  file:
+    enabled: false
+    path: /var/log/log-collector/output.log
+    maxsizemb: 100
+    maxbackups: 3
+    maxagedays: 7
+    compress: true
+
+  elasticsearch:
+    enabled: false
+    addresses:
+      - http://localhost:9200
+    index: logs
+    username: ""
+    password: ""
+    batchsize: 100
+    flushinterval: 5s
+
+  loki:
+    enabled: false
+    url: http://localhost:3100
+    tenantid: ""
+    labels:
+      app: log-collector
+    batchsize: 100
+    flushinterval: 1s
+
+  victorialogs:
+    enabled: false
+    url: http://localhost:9428
+    batchsize: 100
+    flushinterval: 1s

@@ -1,0 +1,142 @@
+version: "2"
+
+# This file is used to configure golangci-lint, a Go linter aggregator.
+linters:
+  default: none
+  enable:
+    # Default linters
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Additional linters
+    - asasalint
+    - asciicheck
+    - bidichk
+    # - bodyclose # Not useful for our codebase
+    # - canonicalheader # Not useful for our codebase
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    # - cyclop # Duplicate of gocyclo
+    - decorder
+    # - depguard # Not useful for our codebase
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    # - err113 # Duplicate of errorlint
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    # - exhaustruct # Not useful
+    - exptostd
+    - fatcontext
+    # - forbidigo # Don't understand this one
+    - forcetypeassert
+    # - funcorder # Duplicate of decorder
+    # - funlen # Similar to gocyclo
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    # - gochecknoglobals # We need globals
+    - gochecknoinits
+    # - gochecksumtype # Duplicate of exhaustive
+    - gocognit
+    - goconst
+    - gocritic
+    # - gocyclo # Duplicate of gocognit
+    # - godot # Not useful
+    - godox
+    # - goheader # Not useful for our codebase
+    # - gomoddirectives # Not useful for our codebase
+    # - gomodguard # Not useful for our codebase
+    - goprintffuncname
+    - gosec
+    # - gosmopolitan # i18n/l10n related
+    # - grouper # Not useful for our codebase
+    - iface
+    - importas
+    - inamedparam
+    # - interfacebloat # Not useful for our codebase.
+    - intrange
+    - ireturn
+    # - lll
+    # - maintidx # Duplicate of gocognit
+    # - makezero # Not useful for our codebase
+    - mirror
+    - misspell
+    - mnd
+    - musttag
+    # - nakedret # Not useful for our codebase
+    - nestif
+    - nilerr
+    - nilnesserr
+    - nilnil
+    # - nlreturn # Not useful
+    # - noctx # Not useful for our codebase
+    - nolintlint
+    # - nonamedreturns # Not useful for our codebase
+    - nosprintfhostport
+    - paralleltest
+    - perfsprint
+    - prealloc
+    # - predeclared # Duplicate of govet
+    # - promlinter # Not useful for our codebase
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    # - sloglint # Not useful for our codebase
+    - sqlclosecheck
+    # - tagalign # Not useful
+    # - tagliatelle # Not useful
+    # - testableexamples # Not useful for our codebase
+    # - testifylint # Not useful for our codebase
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - usetesting
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    # - wsl # Not useful
+    # - zerologlint # Not useful for our codebase
+  settings:
+    goconst:
+      min-occurrences: 2
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - dupImport # https://github.com/go-critic/go-critic/issues/845
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+    gocyclo:
+      min-complexity: 15
+    govet:
+      enable:
+        - shadow
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - goimports
+  exclusions:
+    paths:
+      - "tools/.*"
+    # Setting this to true tells the formatter to ignore files 
+    # that have "DO NOT EDIT" comments at the top
+    generated: disable

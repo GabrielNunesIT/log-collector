@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Visualization: Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.19.1
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5602:5601"
+    depends_on:
+      - elasticsearch
+
+  # Visualization: VictoriaLogs
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest
+    container_name: victorialogs
+    ports:
+      - "9428:9428"
+    volumes:
+      - victorialogs-data:/victoria-logs-data
+    command: -storageDataPath=/victoria-logs-data
+
+  # The Log Collector Application
+  collector:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: log-collector
+    command: ["run", "--config", "/etc/log-collector/config.yaml"]
+    volumes:
+      - ./config.yaml:/etc/log-collector/config.yaml:ro
+      - shared_logs:/var/log/input:ro
+    ports:
+      - "5140:5140/udp"
+    depends_on:
+      - elasticsearch
+      - loki
+    restart: unless-stopped
+
+  # Target: Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9201:9200"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Target: Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+  # Visualization: Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    depends_on:
+      - loki
+
+  # Log Generator (Simulates File Logs)
+  log-generator:
+    image: alpine:latest
+    container_name: log-generator
+    volumes:
+      - shared_logs:/var/log/output
+    command: >
+      sh -c "
+        echo 'Starting log generator...';
+        while true; do
+          echo \"\$(date) [INFO] This is a generated log message from file ingestor\" >> /var/log/output/app.log;
+          sleep 2;
+        done
+      "
+
+volumes:
+  shared_logs:
+  victorialogs-data:

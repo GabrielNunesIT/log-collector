@@ -1,0 +1,17 @@
+with-expectations: true
+inpackage: false
+testonly: true
+dir: "tests/mocks"
+mockname: "{{.InterfaceName}}"
+outpkg: "mocks"
+packages:
+  github.com/user/log-collector/internal/testutil:
+    config:
+      dir: "tests/mocks"
+      outpkg: "mocks"
+    interfaces:
+      - BulkIndexer
+      - WriteCloser
+      - PacketConn
+      - Listener
+      - Conn
