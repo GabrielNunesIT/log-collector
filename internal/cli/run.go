@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/pipeline"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/pipeline"
 )
 
 // NewRunCmd creates the run command.

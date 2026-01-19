@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // JournalIngestor is a stub for non-Linux systems.

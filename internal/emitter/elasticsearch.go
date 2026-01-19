@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
 )
 
 // IndexerFactory creates a new BulkIndexer.

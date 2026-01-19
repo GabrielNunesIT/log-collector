@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
 )
 
 func TestFileIngestor(t *testing.T) {

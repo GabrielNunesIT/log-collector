@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // LokiEmitter writes log entries to Grafana Loki.

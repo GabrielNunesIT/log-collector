@@ -5,7 +5,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // Emitter defines the contract for log destinations.

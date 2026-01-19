@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // UDPListenerFactory creates a UDP connection.

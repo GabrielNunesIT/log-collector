@@ -9,11 +9,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/emitter"
-	"github.com/user/log-collector/internal/ingestor"
-	"github.com/user/log-collector/internal/model"
-	"github.com/user/log-collector/internal/processor"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/emitter"
+	"github.com/GabrielNunesIT/log-collector/internal/ingestor"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/processor"
 )
 
 // managedIngestor wraps an ingestor with its lifecycle management.

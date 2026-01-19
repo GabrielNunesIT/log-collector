@@ -4,7 +4,7 @@ package processor
 import (
 	"context"
 
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // Processor defines the contract for log transformations.

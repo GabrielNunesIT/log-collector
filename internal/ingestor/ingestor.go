@@ -4,7 +4,7 @@ package ingestor
 import (
 	"context"
 
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // Ingestor defines the contract for log sources.

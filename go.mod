@@ -1,4 +1,4 @@
-module github.com/user/log-collector
+module github.com/GabrielNunesIT/log-collector
 
 go 1.25.5
 

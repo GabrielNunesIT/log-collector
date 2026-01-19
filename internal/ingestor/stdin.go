@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // StdinIngestor reads log entries from standard input.

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/natefinch/lumberjack"
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
 )
 
 // WriterFactory creates a new WriteCloser.

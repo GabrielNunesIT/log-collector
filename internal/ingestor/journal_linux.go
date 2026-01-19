@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/coreos/go-systemd/v22/sdjournal"
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
 )
 
 // JournalIngestor reads logs from the systemd journal.

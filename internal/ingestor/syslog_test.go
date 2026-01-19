@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/tests/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
-	"github.com/user/log-collector/tests/mocks"
 )
 
 func TestSyslogIngestor_UDP(t *testing.T) {

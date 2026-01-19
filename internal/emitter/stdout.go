@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
 
 // StdoutEmitter writes log entries to standard output.

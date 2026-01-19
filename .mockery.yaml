@@ -5,7 +5,7 @@ dir: "tests/mocks"
 mockname: "{{.InterfaceName}}"
 outpkg: "mocks"
 packages:
-  github.com/user/log-collector/internal/testutil:
+  github.com/GabrielNunesIT/log-collector/internal/testutil:
     config:
       dir: "tests/mocks"
       outpkg: "mocks"

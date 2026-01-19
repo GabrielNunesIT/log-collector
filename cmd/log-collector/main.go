@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/user/log-collector/internal/cli"
+	"github.com/GabrielNunesIT/log-collector/internal/cli"
 )
 
 func main() {

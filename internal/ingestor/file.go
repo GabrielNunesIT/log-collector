@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/log-collector/internal/config"
+	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/fsnotify/fsnotify"
-	"github.com/user/log-collector/internal/config"
-	"github.com/user/log-collector/internal/model"
 )
 
 // FileIngestor tails files matching configured paths and emits log entries.
