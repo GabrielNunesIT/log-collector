@@ -44,7 +44,7 @@ func TestSyslogIngestor_UDP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockPC := mocks.NewPacketConn(t)
-			
+
 			// Synchronization channel
 			blockRead := make(chan struct{})
 			msgBytes := []byte(tt.message)
@@ -58,7 +58,7 @@ func TestSyslogIngestor_UDP(t *testing.T) {
 			// Second call: Block until context done
 			mockPC.On("ReadFrom", mock.Anything).Run(func(args mock.Arguments) {
 				close(blockRead)
-				<-time.After(500 * time.Millisecond) 
+				<-time.After(500 * time.Millisecond)
 			}).Return(0, nil, io.EOF)
 
 			mockPC.On("Close").Return(nil)
@@ -68,11 +68,11 @@ func TestSyslogIngestor_UDP(t *testing.T) {
 			}
 
 			out := make(chan *model.LogEntry, 1)
-			ingestor := NewSyslogIngestor(tt.cfg, WithUDPListenerFactory(factory))
+			ingestor := NewSyslogIngestor(tt.cfg, testLogger(), WithUDPListenerFactory(factory))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			startDone := make(chan error)
-			
+
 			go func() {
 				startDone <- ingestor.Start(ctx, out)
 			}()
@@ -91,7 +91,7 @@ func TestSyslogIngestor_UDP(t *testing.T) {
 				cancel()
 				t.Fatal("timeout waiting for log entry")
 			}
-			
+
 			// Wait until we hit the blocking read
 			select {
 			case <-blockRead:
@@ -106,12 +106,12 @@ func TestSyslogIngestor_UDP(t *testing.T) {
 
 func TestSyslogIngestor_TCP(t *testing.T) {
 	tests := []struct {
-		name           string
-		cfg            config.SyslogIngestorConfig
-		message        string
-		remoteAddr     *net.TCPAddr
-		expectedRaw    string
-		expectedProto  string
+		name          string
+		cfg           config.SyslogIngestorConfig
+		message       string
+		remoteAddr    *net.TCPAddr
+		expectedRaw   string
+		expectedProto string
 	}{
 		{
 			name: "Standard Message",
@@ -131,19 +131,19 @@ func TestSyslogIngestor_TCP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockL := mocks.NewListener(t)
 			mockConn := mocks.NewConn(t)
-			
+
 			// Synchronization for Accept loop
 			blockAccept := make(chan struct{})
 
 			// Setup Listener Accept
 			mockL.On("Accept").Return(mockConn, nil).Once()
-			
+
 			// Second accept blocks
 			mockL.On("Accept").Run(func(args mock.Arguments) {
 				close(blockAccept)
 				<-time.After(500 * time.Millisecond)
 			}).Return(nil, io.EOF)
-			
+
 			mockL.On("Close").Return(nil)
 
 			// Setup Conn Read
@@ -154,7 +154,7 @@ func TestSyslogIngestor_TCP(t *testing.T) {
 			}, nil).Once()
 
 			mockConn.On("Read", mock.Anything).Return(0, io.EOF)
-			
+
 			mockConn.On("RemoteAddr").Return(tt.remoteAddr)
 			mockConn.On("Close").Return(nil)
 
@@ -163,7 +163,7 @@ func TestSyslogIngestor_TCP(t *testing.T) {
 			}
 
 			out := make(chan *model.LogEntry, 1)
-			ingestor := NewSyslogIngestor(tt.cfg, WithTCPListenerFactory(factory))
+			ingestor := NewSyslogIngestor(tt.cfg, testLogger(), WithTCPListenerFactory(factory))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			startDone := make(chan error)
@@ -180,7 +180,7 @@ func TestSyslogIngestor_TCP(t *testing.T) {
 				cancel()
 				t.Fatal("timeout waiting for log entry")
 			}
-			
+
 			// Wait for blocking Accept
 			select {
 			case <-blockAccept:

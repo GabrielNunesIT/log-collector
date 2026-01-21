@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/fsnotify/fsnotify"
@@ -17,15 +18,17 @@ import (
 
 // FileIngestor tails files matching configured paths and emits log entries.
 type FileIngestor struct {
-	cfg   config.FileIngestorConfig
-	name  string
+	cfg    config.FileIngestorConfig
+	name   string
+	logger logger.ILogger
 }
 
 // NewFileIngestor creates a new file tailing ingestor.
-func NewFileIngestor(cfg config.FileIngestorConfig) *FileIngestor {
+func NewFileIngestor(cfg config.FileIngestorConfig, log logger.ILogger) *FileIngestor {
 	return &FileIngestor{
-		cfg:  cfg,
-		name: "file",
+		cfg:    cfg,
+		name:   "file",
+		logger: log.SubLogger("FileIngestor"),
 	}
 }
 
@@ -54,6 +57,7 @@ func (f *FileIngestor) Start(ctx context.Context, out chan<- *model.LogEntry) er
 
 	// Filter excluded files
 	files = f.filterExcluded(files)
+	f.logger.Infof("watching %d files", len(files))
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -69,12 +73,14 @@ func (f *FileIngestor) Start(ctx context.Context, out chan<- *model.LogEntry) er
 	for _, file := range files {
 		info, err := os.Stat(file)
 		if err != nil {
+			f.logger.Debugf("skipping file (stat error): file=%s, error=%v", file, err)
 			continue
 		}
 		positions[file] = info.Size()
 		if err := watcher.Add(file); err != nil {
 			return fmt.Errorf("watching file %q: %w", file, err)
 		}
+		f.logger.Debugf("watching file: %s (size=%d)", file, info.Size())
 	}
 
 	// Also watch directories for new files
@@ -89,6 +95,7 @@ func (f *FileIngestor) Start(ctx context.Context, out chan<- *model.LogEntry) er
 	for {
 		select {
 		case <-ctx.Done():
+			f.logger.Debug("file ingestor stopped")
 			return ctx.Err()
 
 		case event, ok := <-watcher.Events:
@@ -103,7 +110,7 @@ func (f *FileIngestor) Start(ctx context.Context, out chan<- *model.LogEntry) er
 
 				newPos, err := f.readNewLines(ctx, event.Name, pos, out)
 				if err != nil {
-					// Log error but continue watching
+					f.logger.Debugf("read error: file=%s, error=%v", event.Name, err)
 					continue
 				}
 
@@ -115,6 +122,7 @@ func (f *FileIngestor) Start(ctx context.Context, out chan<- *model.LogEntry) er
 			// Handle file rotation (create after delete)
 			if event.Op&fsnotify.Create == fsnotify.Create {
 				if f.matchesPatterns(event.Name) && !f.isExcluded(event.Name) {
+					f.logger.Infof("new file detected: %s", event.Name)
 					mu.Lock()
 					positions[event.Name] = 0
 					mu.Unlock()
@@ -126,8 +134,7 @@ func (f *FileIngestor) Start(ctx context.Context, out chan<- *model.LogEntry) er
 			if !ok {
 				return nil
 			}
-			// Log error but continue
-			_ = err
+			f.logger.Warningf("fsnotify error: %v", err)
 		}
 	}
 }
@@ -146,6 +153,7 @@ func (f *FileIngestor) readNewLines(ctx context.Context, path string, pos int64,
 		return pos, err
 	}
 	if info.Size() < pos {
+		f.logger.Infof("file rotated (truncated): %s", path)
 		pos = 0 // File was truncated, read from beginning
 	}
 
@@ -154,6 +162,7 @@ func (f *FileIngestor) readNewLines(ctx context.Context, path string, pos int64,
 	}
 
 	scanner := bufio.NewScanner(file)
+	lineCount := 0
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
@@ -163,12 +172,17 @@ func (f *FileIngestor) readNewLines(ctx context.Context, path string, pos int64,
 
 		entry := model.NewLogEntry(f.name, []byte(scanner.Text()))
 		entry.Metadata["file"] = path
+		lineCount++
 
 		select {
 		case out <- entry:
 		case <-ctx.Done():
 			return pos, ctx.Err()
 		}
+	}
+
+	if lineCount > 0 {
+		f.logger.Debugf("read %d lines from %s", lineCount, path)
 	}
 
 	newPos, _ := file.Seek(0, io.SeekCurrent)

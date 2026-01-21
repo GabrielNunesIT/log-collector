@@ -2,10 +2,10 @@ package config
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -17,15 +17,17 @@ type ConfigWatcher struct {
 	debounce   time.Duration
 	lastConfig *Config
 	mu         sync.Mutex
+	logger     logger.ILogger
 }
 
 // NewConfigWatcher creates a new config file watcher.
-func NewConfigWatcher(path string) *ConfigWatcher {
+func NewConfigWatcher(path string, log logger.ILogger) *ConfigWatcher {
 	return &ConfigWatcher{
 		path:     path,
 		onChange: make(chan *Config, 1),
 		onError:  make(chan error, 1),
 		debounce: 100 * time.Millisecond,
+		logger:   log.SubLogger("ConfigWatcher"),
 	}
 }
 
@@ -51,6 +53,7 @@ func (w *ConfigWatcher) Start(ctx context.Context) error {
 		return err
 	}
 
+	w.logger.Debugf("started watching config file: %s", w.path)
 	go w.watchLoop(ctx, watcher)
 	return nil
 }
@@ -68,6 +71,7 @@ func (w *ConfigWatcher) watchLoop(ctx context.Context, watcher *fsnotify.Watcher
 			if debounceTimer != nil {
 				debounceTimer.Stop()
 			}
+			w.logger.Debug("config watcher stopped")
 			return
 
 		case event, ok := <-watcher.Events:
@@ -79,6 +83,8 @@ func (w *ConfigWatcher) watchLoop(ctx context.Context, watcher *fsnotify.Watcher
 			if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
 				continue
 			}
+
+			w.logger.Debugf("config file change detected: op=%s", event.Op)
 
 			// Debounce rapid changes
 			if debounceTimer != nil {
@@ -95,6 +101,7 @@ func (w *ConfigWatcher) watchLoop(ctx context.Context, watcher *fsnotify.Watcher
 			if !ok {
 				return
 			}
+			w.logger.Errorf("fsnotify error: %v", err)
 			select {
 			case w.onError <- err:
 			default:
@@ -107,7 +114,7 @@ func (w *ConfigWatcher) watchLoop(ctx context.Context, watcher *fsnotify.Watcher
 func (w *ConfigWatcher) reload() {
 	cfg, err := Load(w.path)
 	if err != nil {
-		slog.Error("failed to reload config", "error", err)
+		w.logger.Errorf("failed to reload config: %v", err)
 		select {
 		case w.onError <- err:
 		default:
@@ -119,12 +126,13 @@ func (w *ConfigWatcher) reload() {
 	w.lastConfig = cfg
 	w.mu.Unlock()
 
-	slog.Info("config reloaded", "path", w.path)
+	w.logger.Infof("config reloaded: path=%s", w.path)
 
 	select {
 	case w.onChange <- cfg:
 	default:
 		// Channel full, drop older update
+		w.logger.Warning("config change channel full, dropping update")
 	}
 }
 

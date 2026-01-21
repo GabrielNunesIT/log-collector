@@ -3,13 +3,13 @@ package cli
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/pipeline"
 )
@@ -41,7 +41,7 @@ func NewRunCmd(cfgFile, logLevel *string) *cobra.Command {
 }
 
 func runPipeline(cmd *cobra.Command, cfgFile, logLevel *string) error {
-	SetupLogging(*logLevel)
+	log := SetupLogging(*logLevel)
 
 	cfg, err := config.Load(*cfgFile)
 	if err != nil {
@@ -50,15 +50,13 @@ func runPipeline(cmd *cobra.Command, cfgFile, logLevel *string) error {
 
 	applyCLIOverrides(cmd, cfg)
 
-	p, err := pipeline.New(cfg)
+	p, err := pipeline.New(cfg, log)
 	if err != nil {
 		return fmt.Errorf("creating pipeline: %w", err)
 	}
 
-	slog.Info("starting log collector",
-		"ingestors", p.IngestorCount(),
-		"emitters", p.EmitterCount(),
-	)
+	log.Infof("starting log collector: ingestors=%d, emitters=%d",
+		p.IngestorCount(), p.EmitterCount())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -68,27 +66,27 @@ func runPipeline(cmd *cobra.Command, cfgFile, logLevel *string) error {
 
 	hotReloadEnabled, _ := cmd.Flags().GetBool("hot-reload")
 	if *cfgFile != "" && hotReloadEnabled {
-		startConfigWatcher(ctx, cmd, cfgFile, p)
+		startConfigWatcher(ctx, cmd, cfgFile, p, log)
 	}
 
-	go handleSignals(ctx, cancel, sigChan, cmd, cfgFile, p)
+	go handleSignals(ctx, cancel, sigChan, cmd, cfgFile, p, log)
 
 	if err := p.Run(ctx); err != nil && err != context.Canceled {
 		return fmt.Errorf("pipeline error: %w", err)
 	}
 
-	slog.Info("log collector stopped")
+	log.Info("log collector stopped")
 	return nil
 }
 
-func startConfigWatcher(ctx context.Context, cmd *cobra.Command, cfgFile *string, p *pipeline.Pipeline) {
-	watcher := config.NewConfigWatcher(*cfgFile)
+func startConfigWatcher(ctx context.Context, cmd *cobra.Command, cfgFile *string, p *pipeline.Pipeline, log logger.ILogger) {
+	watcher := config.NewConfigWatcher(*cfgFile, log)
 	if err := watcher.Start(ctx); err != nil {
-		slog.Warn("failed to start config watcher", "error", err)
+		log.Warningf("failed to start config watcher: %v", err)
 		return
 	}
 
-	slog.Info("hot-reload enabled", "config", *cfgFile)
+	log.Infof("hot-reload enabled: config=%s", *cfgFile)
 
 	go func() {
 		for {
@@ -96,10 +94,10 @@ func startConfigWatcher(ctx context.Context, cmd *cobra.Command, cfgFile *string
 			case newCfg := <-watcher.Changes():
 				applyCLIOverrides(cmd, newCfg)
 				if err := p.Reconfigure(newCfg); err != nil {
-					slog.Error("reconfigure failed", "error", err)
+					log.Errorf("reconfigure failed: %v", err)
 				}
 			case err := <-watcher.Errors():
-				slog.Error("config watcher error", "error", err)
+				log.Errorf("config watcher error: %v", err)
 			case <-ctx.Done():
 				return
 			}
@@ -107,24 +105,24 @@ func startConfigWatcher(ctx context.Context, cmd *cobra.Command, cfgFile *string
 	}()
 }
 
-func handleSignals(ctx context.Context, cancel context.CancelFunc, sigChan <-chan os.Signal, cmd *cobra.Command, cfgFile *string, p *pipeline.Pipeline) {
+func handleSignals(ctx context.Context, cancel context.CancelFunc, sigChan <-chan os.Signal, cmd *cobra.Command, cfgFile *string, p *pipeline.Pipeline, log logger.ILogger) {
 	for {
 		select {
 		case sig := <-sigChan:
 			switch sig {
 			case syscall.SIGHUP:
-				slog.Info("received SIGHUP, reloading config")
+				log.Info("received SIGHUP, reloading config")
 				newCfg, err := config.Load(*cfgFile)
 				if err != nil {
-					slog.Error("failed to reload config", "error", err)
+					log.Errorf("failed to reload config: %v", err)
 					continue
 				}
 				applyCLIOverrides(cmd, newCfg)
 				if err := p.Reconfigure(newCfg); err != nil {
-					slog.Error("reconfigure failed", "error", err)
+					log.Errorf("reconfigure failed: %v", err)
 				}
 			case syscall.SIGINT, syscall.SIGTERM:
-				slog.Info("received shutdown signal", "signal", sig)
+				log.Infof("received shutdown signal: %v", sig)
 				cancel()
 				return
 			}

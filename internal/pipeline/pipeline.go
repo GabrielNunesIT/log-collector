@@ -4,11 +4,11 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/emitter"
 	"github.com/GabrielNunesIT/log-collector/internal/ingestor"
@@ -33,8 +33,9 @@ type managedEmitter struct {
 
 // Pipeline coordinates ingestors, processors, and emitters.
 type Pipeline struct {
-	cfg *config.Config
-	mu  sync.RWMutex
+	cfg    *config.Config
+	logger logger.ILogger
+	mu     sync.RWMutex
 
 	ingestors map[string]*managedIngestor
 	emitters  map[string]*managedEmitter
@@ -48,9 +49,10 @@ type Pipeline struct {
 }
 
 // New creates a new pipeline from configuration.
-func New(cfg *config.Config) (*Pipeline, error) {
+func New(cfg *config.Config, log logger.ILogger) (*Pipeline, error) {
 	p := &Pipeline{
 		cfg:        cfg,
+		logger:     log.SubLogger("Pipeline"),
 		ingestors:  make(map[string]*managedIngestor),
 		emitters:   make(map[string]*managedEmitter),
 		fanoutChan: make(chan *model.LogEntry, cfg.Pipeline.BufferSize),
@@ -76,7 +78,7 @@ func (p *Pipeline) buildIngestors() error {
 			return err
 		}
 		p.ingestors["file"] = &managedIngestor{
-			ingestor:  ingestor.NewFileIngestor(p.cfg.Ingestors.File),
+			ingestor:  ingestor.NewFileIngestor(p.cfg.Ingestors.File, p.logger),
 			processor: chain,
 			done:      make(chan struct{}),
 		}
@@ -89,7 +91,7 @@ func (p *Pipeline) buildIngestors() error {
 			return err
 		}
 		p.ingestors["syslog"] = &managedIngestor{
-			ingestor:  ingestor.NewSyslogIngestor(p.cfg.Ingestors.Syslog),
+			ingestor:  ingestor.NewSyslogIngestor(p.cfg.Ingestors.Syslog, p.logger),
 			processor: chain,
 			done:      make(chan struct{}),
 		}
@@ -102,7 +104,7 @@ func (p *Pipeline) buildIngestors() error {
 			return err
 		}
 		p.ingestors["journal"] = &managedIngestor{
-			ingestor:  ingestor.NewJournalIngestor(p.cfg.Ingestors.Journal),
+			ingestor:  ingestor.NewJournalIngestor(p.cfg.Ingestors.Journal, p.logger),
 			processor: chain,
 			done:      make(chan struct{}),
 		}
@@ -115,7 +117,7 @@ func (p *Pipeline) buildIngestors() error {
 			return err
 		}
 		p.ingestors["stdin"] = &managedIngestor{
-			ingestor:  ingestor.NewStdinIngestor(p.cfg.Ingestors.Stdin),
+			ingestor:  ingestor.NewStdinIngestor(p.cfg.Ingestors.Stdin, p.logger),
 			processor: chain,
 			done:      make(chan struct{}),
 		}
@@ -125,6 +127,7 @@ func (p *Pipeline) buildIngestors() error {
 		return fmt.Errorf("no ingestors enabled")
 	}
 
+	p.logger.Debugf("built %d ingestors", len(p.ingestors))
 	return nil
 }
 
@@ -152,35 +155,35 @@ func (p *Pipeline) buildProcessorChain(cfg config.ProcessorConfig) (*processor.C
 func (p *Pipeline) buildEmitters() error {
 	if p.cfg.Emitters.Stdout.Enabled {
 		p.emitters["stdout"] = &managedEmitter{
-			emitter: emitter.NewStdoutEmitter(p.cfg.Emitters.Stdout),
+			emitter: emitter.NewStdoutEmitter(p.cfg.Emitters.Stdout, p.logger),
 			done:    make(chan struct{}),
 		}
 	}
 
 	if p.cfg.Emitters.File.Enabled {
 		p.emitters["file"] = &managedEmitter{
-			emitter: emitter.NewFileEmitter(p.cfg.Emitters.File),
+			emitter: emitter.NewFileEmitter(p.cfg.Emitters.File, p.logger),
 			done:    make(chan struct{}),
 		}
 	}
 
 	if p.cfg.Emitters.Elasticsearch.Enabled {
 		p.emitters["elasticsearch"] = &managedEmitter{
-			emitter: emitter.NewElasticsearchEmitter(p.cfg.Emitters.Elasticsearch),
+			emitter: emitter.NewElasticsearchEmitter(p.cfg.Emitters.Elasticsearch, p.logger),
 			done:    make(chan struct{}),
 		}
 	}
 
 	if p.cfg.Emitters.Loki.Enabled {
 		p.emitters["loki"] = &managedEmitter{
-			emitter: emitter.NewLokiEmitter(p.cfg.Emitters.Loki),
+			emitter: emitter.NewLokiEmitter(p.cfg.Emitters.Loki, p.logger),
 			done:    make(chan struct{}),
 		}
 	}
 
 	if p.cfg.Emitters.VictoriaLogs.Enabled {
 		p.emitters["victorialogs"] = &managedEmitter{
-			emitter: emitter.NewVictoriaLogsEmitter(p.cfg.Emitters.VictoriaLogs),
+			emitter: emitter.NewVictoriaLogsEmitter(p.cfg.Emitters.VictoriaLogs, p.logger),
 			done:    make(chan struct{}),
 		}
 	}
@@ -189,6 +192,7 @@ func (p *Pipeline) buildEmitters() error {
 		return fmt.Errorf("no emitters enabled")
 	}
 
+	p.logger.Debugf("built %d emitters", len(p.emitters))
 	return nil
 }
 
@@ -203,6 +207,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			p.mu.RUnlock()
 			return fmt.Errorf("starting emitter %s: %w", name, err)
 		}
+		p.logger.Debugf("started emitter: %s", name)
 	}
 	p.mu.RUnlock()
 
@@ -223,6 +228,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 
 		g.Go(func() error {
 			defer close(mi.done)
+			p.logger.Debugf("started ingestor: %s", name)
 			return p.runIngestorPipeline(ingestorCtx, name, mi)
 		})
 	}
@@ -245,11 +251,12 @@ func (p *Pipeline) shutdown() {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	for _, me := range p.emitters {
+	for name, me := range p.emitters {
 		if stopErr := me.emitter.Stop(shutdownCtx); stopErr != nil {
-			slog.Warn("emitter stop error", "error", stopErr)
+			p.logger.Warningf("emitter stop error: name=%s, error=%v", name, stopErr)
 		}
 	}
+	p.logger.Debug("all emitters stopped")
 }
 
 // runIngestorPipeline runs a single ingestor and its processor chain.
@@ -264,6 +271,7 @@ func (p *Pipeline) runIngestorPipeline(ctx context.Context, name string, mi *man
 		defer wg.Done()
 		for entry := range rawChan {
 			if err := mi.processor.Process(ctx, entry); err != nil {
+				p.logger.Debugf("processor error: ingestor=%s, error=%v", name, err)
 				continue
 			}
 
@@ -273,6 +281,7 @@ func (p *Pipeline) runIngestorPipeline(ctx context.Context, name string, mi *man
 				return
 			default:
 				if p.cfg.Pipeline.DropOnFullBuffer {
+					p.logger.Debug("buffer full, dropping entry")
 					continue
 				}
 				select {
@@ -290,7 +299,7 @@ func (p *Pipeline) runIngestorPipeline(ctx context.Context, name string, mi *man
 	// Wait for processor to drain
 	wg.Wait()
 
-	slog.Debug("ingestor stopped", "name", name)
+	p.logger.Debugf("ingestor stopped: name=%s", name)
 	return err
 }
 
@@ -333,7 +342,7 @@ func (p *Pipeline) emitToAll(ctx context.Context, entry *model.LogEntry) {
 		go func() {
 			defer wg.Done()
 			if err := e.Emit(ctx, entry.Clone()); err != nil {
-				slog.Debug("emit error", "emitter", e.Name(), "error", err)
+				p.logger.Debugf("emit error: emitter=%s, error=%v", e.Name(), err)
 			}
 		}()
 	}
@@ -358,10 +367,8 @@ func (p *Pipeline) Reconfigure(newCfg *config.Config) error {
 		return fmt.Errorf("reconfiguring emitters: %w", err)
 	}
 
-	slog.Info("configuration applied",
-		"ingestors", len(p.ingestors),
-		"emitters", len(p.emitters),
-	)
+	p.logger.Infof("configuration applied: ingestors=%d, emitters=%d",
+		len(p.ingestors), len(p.emitters))
 
 	return nil
 }
@@ -417,16 +424,16 @@ func (p *Pipeline) addIngestor(name string, cfg *config.Config) error {
 
 	switch name {
 	case "file":
-		ing = ingestor.NewFileIngestor(cfg.Ingestors.File)
+		ing = ingestor.NewFileIngestor(cfg.Ingestors.File, p.logger)
 		procCfg = cfg.Ingestors.File.Processor
 	case "syslog":
-		ing = ingestor.NewSyslogIngestor(cfg.Ingestors.Syslog)
+		ing = ingestor.NewSyslogIngestor(cfg.Ingestors.Syslog, p.logger)
 		procCfg = cfg.Ingestors.Syslog.Processor
 	case "journal":
-		ing = ingestor.NewJournalIngestor(cfg.Ingestors.Journal)
+		ing = ingestor.NewJournalIngestor(cfg.Ingestors.Journal, p.logger)
 		procCfg = cfg.Ingestors.Journal.Processor
 	case "stdin":
-		ing = ingestor.NewStdinIngestor(cfg.Ingestors.Stdin)
+		ing = ingestor.NewStdinIngestor(cfg.Ingestors.Stdin, p.logger)
 		procCfg = cfg.Ingestors.Stdin.Processor
 	default:
 		return fmt.Errorf("unknown ingestor: %s", name)
@@ -451,11 +458,11 @@ func (p *Pipeline) addIngestor(name string, cfg *config.Config) error {
 	go func() {
 		defer close(mi.done)
 		if err := p.runIngestorPipeline(ctx, name, mi); err != nil {
-			slog.Warn("ingestor error", "name", name, "error", err)
+			p.logger.Warningf("ingestor error: name=%s, error=%v", name, err)
 		}
 	}()
 
-	slog.Info("ingestor added", "name", name)
+	p.logger.Infof("ingestor added: %s", name)
 	return nil
 }
 
@@ -475,7 +482,7 @@ func (p *Pipeline) removeIngestor(name string) error {
 	<-mi.done
 
 	delete(p.ingestors, name)
-	slog.Info("ingestor removed", "name", name)
+	p.logger.Infof("ingestor removed: %s", name)
 	return nil
 }
 
@@ -528,15 +535,15 @@ func (p *Pipeline) addEmitter(name string, cfg *config.Config) error {
 
 	switch name {
 	case "stdout":
-		em = emitter.NewStdoutEmitter(cfg.Emitters.Stdout)
+		em = emitter.NewStdoutEmitter(cfg.Emitters.Stdout, p.logger)
 	case "file":
-		em = emitter.NewFileEmitter(cfg.Emitters.File)
+		em = emitter.NewFileEmitter(cfg.Emitters.File, p.logger)
 	case "elasticsearch":
-		em = emitter.NewElasticsearchEmitter(cfg.Emitters.Elasticsearch)
+		em = emitter.NewElasticsearchEmitter(cfg.Emitters.Elasticsearch, p.logger)
 	case "loki":
-		em = emitter.NewLokiEmitter(cfg.Emitters.Loki)
+		em = emitter.NewLokiEmitter(cfg.Emitters.Loki, p.logger)
 	case "victorialogs":
-		em = emitter.NewVictoriaLogsEmitter(cfg.Emitters.VictoriaLogs)
+		em = emitter.NewVictoriaLogsEmitter(cfg.Emitters.VictoriaLogs, p.logger)
 	default:
 		return fmt.Errorf("unknown emitter: %s", name)
 	}
@@ -550,7 +557,7 @@ func (p *Pipeline) addEmitter(name string, cfg *config.Config) error {
 		done:    make(chan struct{}),
 	}
 
-	slog.Info("emitter added", "name", name)
+	p.logger.Infof("emitter added: %s", name)
 	return nil
 }
 
@@ -565,11 +572,11 @@ func (p *Pipeline) removeEmitter(name string) error {
 	defer cancel()
 
 	if err := me.emitter.Stop(shutdownCtx); err != nil {
-		slog.Warn("emitter stop error", "name", name, "error", err)
+		p.logger.Warningf("emitter stop error: name=%s, error=%v", name, err)
 	}
 
 	delete(p.emitters, name)
-	slog.Info("emitter removed", "name", name)
+	p.logger.Infof("emitter removed: %s", name)
 	return nil
 }
 

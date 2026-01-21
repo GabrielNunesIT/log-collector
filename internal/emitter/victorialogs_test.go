@@ -14,7 +14,7 @@ import (
 
 func TestVictoriaLogsEmitter_Name(t *testing.T) {
 	cfg := config.VictoriaLogsEmitterConfig{}
-	emitter := NewVictoriaLogsEmitter(cfg)
+	emitter := NewVictoriaLogsEmitter(cfg, testLogger())
 
 	if emitter.Name() != "victorialogs" {
 		t.Errorf("expected name 'victorialogs', got %q", emitter.Name())
@@ -43,7 +43,7 @@ func TestVictoriaLogsEmitter_Emit_BatchFlush(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewVictoriaLogsEmitter(cfg, WithVictoriaLogsHTTPClient(mock))
+	emitter := NewVictoriaLogsEmitter(cfg, testLogger(), WithVictoriaLogsHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Date(2026, 1, 18, 12, 0, 0, 0, time.UTC),
@@ -104,7 +104,7 @@ func TestVictoriaLogsEmitter_Emit_HTTPError(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewVictoriaLogsEmitter(cfg, WithVictoriaLogsHTTPClient(mock))
+	emitter := NewVictoriaLogsEmitter(cfg, testLogger(), WithVictoriaLogsHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Now(),
@@ -140,7 +140,7 @@ func TestVictoriaLogsEmitter_Emit_NoBatchFlush(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewVictoriaLogsEmitter(cfg, WithVictoriaLogsHTTPClient(mock))
+	emitter := NewVictoriaLogsEmitter(cfg, testLogger(), WithVictoriaLogsHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Now(),
@@ -177,7 +177,7 @@ func TestVictoriaLogsEmitter_MultipleBatchesSameStream(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewVictoriaLogsEmitter(cfg, WithVictoriaLogsHTTPClient(mock))
+	emitter := NewVictoriaLogsEmitter(cfg, testLogger(), WithVictoriaLogsHTTPClient(mock))
 
 	for i := 0; i < 3; i++ {
 		entry := &model.LogEntry{

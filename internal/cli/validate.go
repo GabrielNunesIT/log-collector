@@ -2,9 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/pipeline"
 )
@@ -20,7 +22,10 @@ func NewValidateCmd(cfgFile *string) *cobra.Command {
 				return fmt.Errorf("configuration error: %w", err)
 			}
 
-			p, err := pipeline.New(cfg)
+			// Create a silent logger for validation (discards output)
+			log := logger.NewConsoleLogger(io.Discard)
+
+			p, err := pipeline.New(cfg, log)
 			if err != nil {
 				return fmt.Errorf("pipeline configuration error: %w", err)
 			}

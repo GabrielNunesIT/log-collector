@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
@@ -20,6 +21,7 @@ type VictoriaLogsEmitter struct {
 	batch  []map[string]any
 	mu     sync.Mutex
 	done   chan struct{}
+	logger logger.ILogger
 }
 
 // VictoriaLogsOption configures a VictoriaLogsEmitter.
@@ -33,13 +35,14 @@ func WithVictoriaLogsHTTPClient(client HTTPDoer) VictoriaLogsOption {
 }
 
 // NewVictoriaLogsEmitter creates a new VictoriaLogs emitter.
-func NewVictoriaLogsEmitter(cfg config.VictoriaLogsEmitterConfig, opts ...VictoriaLogsOption) *VictoriaLogsEmitter {
+func NewVictoriaLogsEmitter(cfg config.VictoriaLogsEmitterConfig, log logger.ILogger, opts ...VictoriaLogsOption) *VictoriaLogsEmitter {
 	v := &VictoriaLogsEmitter{
 		cfg: cfg,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		done: make(chan struct{}),
+		done:   make(chan struct{}),
+		logger: log.SubLogger("VictoriaLogsEmitter"),
 	}
 	for _, opt := range opts {
 		opt(v)
@@ -54,6 +57,7 @@ func (v *VictoriaLogsEmitter) Name() string {
 
 // Start begins the background flush goroutine.
 func (v *VictoriaLogsEmitter) Start(ctx context.Context) error {
+	v.logger.Infof("connected to VictoriaLogs: url=%s", v.cfg.URL)
 	go v.flushLoop(ctx)
 	return nil
 }
@@ -61,6 +65,7 @@ func (v *VictoriaLogsEmitter) Start(ctx context.Context) error {
 // Stop flushes remaining entries and shuts down.
 func (v *VictoriaLogsEmitter) Stop(ctx context.Context) error {
 	close(v.done)
+	v.logger.Debug("flushing remaining entries")
 	return v.flush(ctx)
 }
 
@@ -76,7 +81,9 @@ func (v *VictoriaLogsEmitter) flushLoop(ctx context.Context) {
 		case <-v.done:
 			return
 		case <-ticker.C:
-			_ = v.flush(ctx)
+			if err := v.flush(ctx); err != nil {
+				v.logger.Debugf("flush error: %v", err)
+			}
 		}
 	}
 }
@@ -123,6 +130,8 @@ func (v *VictoriaLogsEmitter) flushLocked(ctx context.Context) error {
 		return nil
 	}
 
+	batchSize := len(v.batch)
+
 	// VictoriaLogs uses jsonline format
 	var buf bytes.Buffer
 	for _, doc := range v.batch {
@@ -144,13 +153,17 @@ func (v *VictoriaLogsEmitter) flushLocked(ctx context.Context) error {
 
 	resp, err := v.client.Do(httpReq)
 	if err != nil {
+		v.logger.Debugf("push failed: %v", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		v.logger.Debugf("push failed: status=%d", resp.StatusCode)
 		return fmt.Errorf("victorialogs push failed with status: %d", resp.StatusCode)
 	}
+
+	v.logger.Debugf("pushed %d entries to VictoriaLogs", batchSize)
 
 	// Clear batch
 	v.batch = v.batch[:0]

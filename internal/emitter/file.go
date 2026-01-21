@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/natefinch/lumberjack"
@@ -31,12 +32,14 @@ type FileEmitter struct {
 	factory WriterFactory
 	writer  io.WriteCloser
 	mu      sync.Mutex
+	logger  logger.ILogger
 }
 
 // NewFileEmitter creates a new file emitter.
-func NewFileEmitter(cfg config.FileEmitterConfig, opts ...FileOption) *FileEmitter {
+func NewFileEmitter(cfg config.FileEmitterConfig, log logger.ILogger, opts ...FileOption) *FileEmitter {
 	e := &FileEmitter{
-		cfg: cfg,
+		cfg:    cfg,
+		logger: log.SubLogger("FileEmitter"),
 	}
 
 	// Default factory creates lumberjack logger
@@ -69,6 +72,7 @@ func (f *FileEmitter) Start(ctx context.Context) error {
 		return err
 	}
 	f.writer = w
+	f.logger.Infof("writing to file: path=%s, maxSize=%dMB", f.cfg.Path, f.cfg.MaxSizeMB)
 	return nil
 }
 
@@ -78,6 +82,7 @@ func (f *FileEmitter) Stop(ctx context.Context) error {
 	defer f.mu.Unlock()
 
 	if f.writer != nil {
+		f.logger.Debug("closing file writer")
 		return f.writer.Close()
 	}
 	return nil

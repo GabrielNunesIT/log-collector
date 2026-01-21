@@ -1,26 +1,33 @@
 package cli
 
 import (
-	"log/slog"
 	"os"
+	"strings"
+
+	"github.com/GabrielNunesIT/go-libs/logger"
 )
 
-// SetupLogging configures structured logging with the specified level.
-func SetupLogging(level string) {
-	var lvl slog.Level
-	switch level {
+// SetupLogging creates and configures a logger with the specified level.
+// Returns the configured logger for dependency injection.
+func SetupLogging(level string) logger.ILogger {
+	log := logger.NewConsoleLogger(os.Stderr)
+
+	switch strings.ToLower(level) {
+	case "trace":
+		log.SetLevel(logger.LevelTrace)
 	case "debug":
-		lvl = slog.LevelDebug
-	case "warn":
-		lvl = slog.LevelWarn
+		log.SetLevel(logger.LevelDebug)
+	case "warn", "warning":
+		log.SetLevel(logger.LevelWarning)
 	case "error":
-		lvl = slog.LevelError
+		log.SetLevel(logger.LevelError)
 	default:
-		lvl = slog.LevelInfo
+		log.SetLevel(logger.LevelInfo)
 	}
 
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: lvl,
-	})
-	slog.SetDefault(slog.New(handler))
+	// Set as default logger for global access if needed
+	logger.SetDefaultLogger(log)
+	logger.SetCtxFallbackLogger(log)
+
+	return log
 }

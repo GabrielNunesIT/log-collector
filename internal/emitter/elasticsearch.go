@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -34,12 +35,14 @@ type ElasticsearchEmitter struct {
 	factory IndexerFactory
 	indexer esutil.BulkIndexer
 	mu      sync.Mutex
+	logger  logger.ILogger
 }
 
 // NewElasticsearchEmitter creates a new Elasticsearch emitter.
-func NewElasticsearchEmitter(cfg config.ElasticsearchEmitterConfig, opts ...ElasticsearchOption) *ElasticsearchEmitter {
+func NewElasticsearchEmitter(cfg config.ElasticsearchEmitterConfig, log logger.ILogger, opts ...ElasticsearchOption) *ElasticsearchEmitter {
 	e := &ElasticsearchEmitter{
-		cfg: cfg,
+		cfg:    cfg,
+		logger: log.SubLogger("ElasticsearchEmitter"),
 	}
 
 	// Default factory creates real client and indexer
@@ -86,6 +89,7 @@ func (e *ElasticsearchEmitter) Start(ctx context.Context) error {
 		return err
 	}
 	e.indexer = indexer
+	e.logger.Infof("connected to Elasticsearch: addresses=%v, index=%s", e.cfg.Addresses, e.cfg.Index)
 	return nil
 }
 
@@ -95,6 +99,7 @@ func (e *ElasticsearchEmitter) Stop(ctx context.Context) error {
 	defer e.mu.Unlock()
 
 	if e.indexer != nil {
+		e.logger.Debug("closing bulk indexer")
 		return e.indexer.Close(ctx)
 	}
 	return nil
@@ -124,7 +129,7 @@ func (e *ElasticsearchEmitter) Emit(ctx context.Context, entry *model.LogEntry) 
 		Action: "index",
 		Body:   bytes.NewReader(data),
 		OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
-			// Log failure but don't block
+			e.logger.Debugf("indexing failure: error=%v, status=%d", err, res.Status)
 		},
 	})
 }

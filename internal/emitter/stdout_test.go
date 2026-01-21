@@ -18,7 +18,7 @@ func TestStdoutEmitter_JSON(t *testing.T) {
 		Format:  "json",
 	}
 
-	emitter := NewStdoutEmitterWithWriter(cfg, &buf)
+	emitter := NewStdoutEmitterWithWriter(cfg, &buf, testLogger())
 
 	if emitter.Name() != "stdout" {
 		t.Errorf("expected name 'stdout', got %q", emitter.Name())
@@ -66,7 +66,7 @@ func TestStdoutEmitter_Text(t *testing.T) {
 		Format:  "text",
 	}
 
-	emitter := NewStdoutEmitterWithWriter(cfg, &buf)
+	emitter := NewStdoutEmitterWithWriter(cfg, &buf, testLogger())
 
 	entry := &model.LogEntry{
 		Timestamp: time.Date(2026, 1, 18, 12, 0, 0, 0, time.UTC),

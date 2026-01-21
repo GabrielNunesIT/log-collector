@@ -24,7 +24,7 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 func TestLokiEmitter_Name(t *testing.T) {
 	cfg := config.LokiEmitterConfig{}
-	emitter := NewLokiEmitter(cfg)
+	emitter := NewLokiEmitter(cfg, testLogger())
 
 	if emitter.Name() != "loki" {
 		t.Errorf("expected name 'loki', got %q", emitter.Name())
@@ -54,7 +54,7 @@ func TestLokiEmitter_Emit_BatchFlush(t *testing.T) {
 		Labels:        map[string]string{"app": "test"},
 	}
 
-	emitter := NewLokiEmitter(cfg, WithLokiHTTPClient(mock))
+	emitter := NewLokiEmitter(cfg, testLogger(), WithLokiHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Date(2026, 1, 18, 12, 0, 0, 0, time.UTC),
@@ -128,7 +128,7 @@ func TestLokiEmitter_Emit_TenantHeader(t *testing.T) {
 		TenantID:      "my-tenant",
 	}
 
-	emitter := NewLokiEmitter(cfg, WithLokiHTTPClient(mock))
+	emitter := NewLokiEmitter(cfg, testLogger(), WithLokiHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Now(),
@@ -159,7 +159,7 @@ func TestLokiEmitter_Emit_HTTPError(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewLokiEmitter(cfg, WithLokiHTTPClient(mock))
+	emitter := NewLokiEmitter(cfg, testLogger(), WithLokiHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Now(),
@@ -195,7 +195,7 @@ func TestLokiEmitter_Emit_NoBatchFlush(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewLokiEmitter(cfg, WithLokiHTTPClient(mock))
+	emitter := NewLokiEmitter(cfg, testLogger(), WithLokiHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Now(),
@@ -230,7 +230,7 @@ func TestLokiEmitter_Emit_ParsedFieldsAsJSON(t *testing.T) {
 		FlushInterval: time.Hour,
 	}
 
-	emitter := NewLokiEmitter(cfg, WithLokiHTTPClient(mock))
+	emitter := NewLokiEmitter(cfg, testLogger(), WithLokiHTTPClient(mock))
 
 	entry := &model.LogEntry{
 		Timestamp: time.Now(),

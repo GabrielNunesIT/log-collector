@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
@@ -18,21 +19,24 @@ type StdoutEmitter struct {
 	cfg    config.StdoutEmitterConfig
 	writer io.Writer
 	mu     sync.Mutex
+	logger logger.ILogger
 }
 
 // NewStdoutEmitter creates a new stdout emitter.
-func NewStdoutEmitter(cfg config.StdoutEmitterConfig) *StdoutEmitter {
+func NewStdoutEmitter(cfg config.StdoutEmitterConfig, log logger.ILogger) *StdoutEmitter {
 	return &StdoutEmitter{
 		cfg:    cfg,
 		writer: os.Stdout,
+		logger: log.SubLogger("StdoutEmitter"),
 	}
 }
 
 // NewStdoutEmitterWithWriter creates a stdout emitter with a custom writer (for testing).
-func NewStdoutEmitterWithWriter(cfg config.StdoutEmitterConfig, w io.Writer) *StdoutEmitter {
+func NewStdoutEmitterWithWriter(cfg config.StdoutEmitterConfig, w io.Writer, log logger.ILogger) *StdoutEmitter {
 	return &StdoutEmitter{
 		cfg:    cfg,
 		writer: w,
+		logger: log.SubLogger("StdoutEmitter"),
 	}
 }
 
@@ -43,11 +47,13 @@ func (s *StdoutEmitter) Name() string {
 
 // Start initializes the emitter (no-op for stdout).
 func (s *StdoutEmitter) Start(ctx context.Context) error {
+	s.logger.Debugf("stdout emitter started: format=%s", s.cfg.Format)
 	return nil
 }
 
 // Stop gracefully shuts down the emitter (no-op for stdout).
 func (s *StdoutEmitter) Stop(ctx context.Context) error {
+	s.logger.Debug("stdout emitter stopped")
 	return nil
 }
 

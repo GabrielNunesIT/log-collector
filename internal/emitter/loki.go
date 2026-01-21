@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
@@ -21,6 +22,7 @@ type LokiEmitter struct {
 	batch  []lokiStream
 	mu     sync.Mutex
 	done   chan struct{}
+	logger logger.ILogger
 }
 
 // lokiPushRequest is the Loki push API request format.
@@ -45,13 +47,14 @@ func WithLokiHTTPClient(client HTTPDoer) LokiOption {
 }
 
 // NewLokiEmitter creates a new Loki emitter.
-func NewLokiEmitter(cfg config.LokiEmitterConfig, opts ...LokiOption) *LokiEmitter {
+func NewLokiEmitter(cfg config.LokiEmitterConfig, log logger.ILogger, opts ...LokiOption) *LokiEmitter {
 	l := &LokiEmitter{
 		cfg: cfg,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		done: make(chan struct{}),
+		done:   make(chan struct{}),
+		logger: log.SubLogger("LokiEmitter"),
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -66,6 +69,7 @@ func (l *LokiEmitter) Name() string {
 
 // Start begins the background flush goroutine.
 func (l *LokiEmitter) Start(ctx context.Context) error {
+	l.logger.Infof("connected to Loki: url=%s", l.cfg.URL)
 	go l.flushLoop(ctx)
 	return nil
 }
@@ -73,6 +77,7 @@ func (l *LokiEmitter) Start(ctx context.Context) error {
 // Stop flushes remaining entries and shuts down.
 func (l *LokiEmitter) Stop(ctx context.Context) error {
 	close(l.done)
+	l.logger.Debug("flushing remaining entries")
 	return l.flush(ctx)
 }
 
@@ -88,7 +93,9 @@ func (l *LokiEmitter) flushLoop(ctx context.Context) {
 		case <-l.done:
 			return
 		case <-ticker.C:
-			_ = l.flush(ctx)
+			if err := l.flush(ctx); err != nil {
+				l.logger.Debugf("flush error: %v", err)
+			}
 		}
 	}
 }
@@ -187,6 +194,7 @@ func (l *LokiEmitter) flushLocked(ctx context.Context) error {
 		return nil
 	}
 
+	batchSize := l.batchSize()
 	req := lokiPushRequest{Streams: l.batch}
 	data, err := json.Marshal(req)
 	if err != nil {
@@ -206,13 +214,17 @@ func (l *LokiEmitter) flushLocked(ctx context.Context) error {
 
 	resp, err := l.client.Do(httpReq)
 	if err != nil {
+		l.logger.Debugf("push failed: %v", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		l.logger.Debugf("push failed: status=%d", resp.StatusCode)
 		return fmt.Errorf("loki push failed with status: %d", resp.StatusCode)
 	}
+
+	l.logger.Debugf("pushed %d entries to Loki", batchSize)
 
 	// Clear batch
 	l.batch = l.batch[:0]

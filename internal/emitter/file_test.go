@@ -27,7 +27,7 @@ func TestFileEmitter_Start(t *testing.T) {
 			return mockWriter, nil
 		}
 
-		e := NewFileEmitter(cfg, WithWriterFactory(factory))
+		e := NewFileEmitter(cfg, testLogger(), WithWriterFactory(factory))
 		err := e.Start(context.Background())
 		assert.NoError(t, err)
 	})
@@ -37,7 +37,7 @@ func TestFileEmitter_Start(t *testing.T) {
 			return nil, errors.New("factory error")
 		}
 
-		e := NewFileEmitter(cfg, WithWriterFactory(factory))
+		e := NewFileEmitter(cfg, testLogger(), WithWriterFactory(factory))
 		err := e.Start(context.Background())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "factory error")
@@ -70,7 +70,7 @@ func TestFileEmitter_Emit(t *testing.T) {
 				output["host"] == "localhost"
 		})).Return(len(entry.Raw), nil)
 
-		e := NewFileEmitter(cfg, WithWriterFactory(factory))
+		e := NewFileEmitter(cfg, testLogger(), WithWriterFactory(factory))
 		_ = e.Start(context.Background())
 
 		err := e.Emit(context.Background(), entry)
@@ -86,7 +86,7 @@ func TestFileEmitter_Emit(t *testing.T) {
 
 		mockWriter.On("Write", mock.Anything).Return(0, errors.New("disk full"))
 
-		e := NewFileEmitter(cfg, WithWriterFactory(factory))
+		e := NewFileEmitter(cfg, testLogger(), WithWriterFactory(factory))
 		_ = e.Start(context.Background())
 
 		err := e.Emit(context.Background(), entry)
@@ -100,10 +100,10 @@ func TestFileEmitter_Stop(t *testing.T) {
 	factory := func(c config.FileEmitterConfig) (io.WriteCloser, error) {
 		return mockWriter, nil
 	}
-	
+
 	mockWriter.On("Close").Return(nil)
 
-	e := NewFileEmitter(config.FileEmitterConfig{}, WithWriterFactory(factory))
+	e := NewFileEmitter(config.FileEmitterConfig{}, testLogger(), WithWriterFactory(factory))
 	_ = e.Start(context.Background())
 
 	err := e.Stop(context.Background())

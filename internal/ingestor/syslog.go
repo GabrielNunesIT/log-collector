@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
@@ -41,13 +42,15 @@ type SyslogIngestor struct {
 	name       string
 	udpFactory UDPListenerFactory
 	tcpFactory TCPListenerFactory
+	logger     logger.ILogger
 }
 
 // NewSyslogIngestor creates a new syslog ingestor.
-func NewSyslogIngestor(cfg config.SyslogIngestorConfig, opts ...SyslogOption) *SyslogIngestor {
+func NewSyslogIngestor(cfg config.SyslogIngestorConfig, log logger.ILogger, opts ...SyslogOption) *SyslogIngestor {
 	s := &SyslogIngestor{
-		cfg:  cfg,
-		name: "syslog",
+		cfg:    cfg,
+		name:   "syslog",
+		logger: log.SubLogger("SyslogIngestor"),
 	}
 
 	// Default UDP factory
@@ -96,6 +99,8 @@ func (s *SyslogIngestor) startUDP(ctx context.Context, out chan<- *model.LogEntr
 	}
 	defer conn.Close()
 
+	s.logger.Infof("listening on UDP %s", s.cfg.Address)
+
 	// Handle context cancellation
 	go func() {
 		<-ctx.Done()
@@ -103,20 +108,23 @@ func (s *SyslogIngestor) startUDP(ctx context.Context, out chan<- *model.LogEntr
 	}()
 
 	buf := make([]byte, 65535) // Max UDP packet size
+	msgCount := 0
 	for {
 		n, remoteAddr, err := conn.ReadFrom(buf)
 		if err != nil {
 			select {
 			case <-ctx.Done():
+				s.logger.Debugf("UDP listener stopped: messages_received=%d", msgCount)
 				return ctx.Err()
 			default:
-				// Log error and continue
+				s.logger.Debugf("UDP read error: %v", err)
 				continue
 			}
 		}
 
 		message := make([]byte, n)
 		copy(message, buf[:n])
+		msgCount++
 
 		entry := model.NewLogEntry(s.name, message)
 		entry.Metadata["protocol"] = "udp"
@@ -128,6 +136,7 @@ func (s *SyslogIngestor) startUDP(ctx context.Context, out chan<- *model.LogEntr
 		select {
 		case out <- entry:
 		case <-ctx.Done():
+			s.logger.Debugf("UDP listener stopped: messages_received=%d", msgCount)
 			return ctx.Err()
 		}
 	}
@@ -141,6 +150,8 @@ func (s *SyslogIngestor) startTCP(ctx context.Context, out chan<- *model.LogEntr
 	}
 	defer listener.Close()
 
+	s.logger.Infof("listening on TCP %s", s.cfg.Address)
+
 	// Handle context cancellation
 	go func() {
 		<-ctx.Done()
@@ -152,12 +163,15 @@ func (s *SyslogIngestor) startTCP(ctx context.Context, out chan<- *model.LogEntr
 		if err != nil {
 			select {
 			case <-ctx.Done():
+				s.logger.Debug("TCP listener stopped")
 				return ctx.Err()
 			default:
+				s.logger.Debugf("TCP accept error: %v", err)
 				continue
 			}
 		}
 
+		s.logger.Debugf("TCP connection accepted: %s", conn.RemoteAddr())
 		go s.handleTCPConnection(ctx, conn, out)
 	}
 }
@@ -172,6 +186,7 @@ func (s *SyslogIngestor) handleTCPConnection(ctx context.Context, conn net.Conn,
 	// Increase buffer size for long syslog messages
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
+	msgCount := 0
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
@@ -182,6 +197,7 @@ func (s *SyslogIngestor) handleTCPConnection(ctx context.Context, conn net.Conn,
 		entry := model.NewLogEntry(s.name, []byte(scanner.Text()))
 		entry.Metadata["protocol"] = "tcp"
 		entry.Metadata["remote_addr"] = remoteAddr
+		msgCount++
 
 		s.parseSyslogHeader(entry)
 
@@ -191,6 +207,11 @@ func (s *SyslogIngestor) handleTCPConnection(ctx context.Context, conn net.Conn,
 			return
 		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		s.logger.Debugf("TCP connection error: remote=%s, error=%v", remoteAddr, err)
+	}
+	s.logger.Debugf("TCP connection closed: remote=%s, messages=%d", remoteAddr, msgCount)
 }
 
 // parseSyslogHeader extracts priority, facility, and severity from syslog messages.

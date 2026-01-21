@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/GabrielNunesIT/log-collector/tests/mocks"
@@ -15,6 +16,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+// testLogger returns a logger for tests that discards output.
+func testLogger() logger.ILogger {
+	return logger.NewConsoleLogger(io.Discard)
+}
 
 func TestElasticsearchEmitter_Start(t *testing.T) {
 	tests := []struct {
@@ -40,7 +46,7 @@ func TestElasticsearchEmitter_Start(t *testing.T) {
 		},
 		{
 			name: "Factory Error",
-			cfg: config.ElasticsearchEmitterConfig{Enabled: true},
+			cfg:  config.ElasticsearchEmitterConfig{Enabled: true},
 			factoryMock: func(t *testing.T) IndexerFactory {
 				return func(c config.ElasticsearchEmitterConfig) (esutil.BulkIndexer, error) {
 					return nil, errors.New("factory failure")
@@ -53,7 +59,7 @@ func TestElasticsearchEmitter_Start(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			factory := tt.factoryMock(t)
-			e := NewElasticsearchEmitter(tt.cfg, WithIndexerFactory(factory))
+			e := NewElasticsearchEmitter(tt.cfg, testLogger(), WithIndexerFactory(factory))
 			err := e.Start(context.Background())
 			if tt.expectedError != "" {
 				assert.Error(t, err)
@@ -111,12 +117,12 @@ func TestElasticsearchEmitter_Emit(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock(mockIndexer)
 			}
-			
+
 			factory := func(c config.ElasticsearchEmitterConfig) (esutil.BulkIndexer, error) {
 				return mockIndexer, nil
 			}
 
-			e := NewElasticsearchEmitter(tt.cfg, WithIndexerFactory(factory))
+			e := NewElasticsearchEmitter(tt.cfg, testLogger(), WithIndexerFactory(factory))
 			_ = e.Start(context.Background())
 
 			err := e.Emit(context.Background(), tt.entry)
@@ -125,7 +131,7 @@ func TestElasticsearchEmitter_Emit(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			
+
 			mockIndexer.AssertExpectations(t)
 		})
 	}
@@ -147,7 +153,7 @@ func TestElasticsearchEmitter_Stop(t *testing.T) {
 				return mockIndexer, nil
 			}
 
-			e := NewElasticsearchEmitter(config.ElasticsearchEmitterConfig{Enabled: true}, WithIndexerFactory(factory))
+			e := NewElasticsearchEmitter(config.ElasticsearchEmitterConfig{Enabled: true}, testLogger(), WithIndexerFactory(factory))
 			_ = e.Start(context.Background())
 
 			err := e.Stop(context.Background())

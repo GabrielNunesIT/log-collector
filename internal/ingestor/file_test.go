@@ -2,16 +2,23 @@ package ingestor
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testLogger returns a logger for tests that discards output.
+func testLogger() logger.ILogger {
+	return logger.NewConsoleLogger(io.Discard)
+}
 
 func TestFileIngestor(t *testing.T) {
 	// Create temp dir
@@ -20,7 +27,7 @@ func TestFileIngestor(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	logFile := filepath.Join(tmpDir, "app.log")
-	
+
 	// Create initial file
 	f, err := os.Create(logFile)
 	require.NoError(t, err)
@@ -32,7 +39,7 @@ func TestFileIngestor(t *testing.T) {
 		Paths:   []string{filepath.Join(tmpDir, "*.log")},
 	}
 
-	ingestor := NewFileIngestor(cfg)
+	ingestor := NewFileIngestor(cfg, testLogger())
 	out := make(chan *model.LogEntry, 10)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -94,8 +101,8 @@ func TestFileIngestor_Exclude(t *testing.T) {
 		Exclude: []string{"*.exclude.log"},
 	}
 
-	ingestor := NewFileIngestor(cfg)
-	
+	ingestor := NewFileIngestor(cfg, testLogger())
+
 	assert.True(t, ingestor.isExcluded(filepath.Join(tmpDir, "test.exclude.log")))
 	assert.False(t, ingestor.isExcluded(filepath.Join(tmpDir, "test.log")))
 }

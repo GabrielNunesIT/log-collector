@@ -2,13 +2,20 @@ package pipeline
 
 import (
 	"context"
+	"io"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/GabrielNunesIT/go-libs/logger"
 	"github.com/GabrielNunesIT/log-collector/internal/config"
 	"github.com/GabrielNunesIT/log-collector/internal/model"
 )
+
+// testLogger returns a logger for tests that discards output.
+func testLogger() logger.ILogger {
+	return logger.NewConsoleLogger(io.Discard)
+}
 
 // mockEmitter implements emitter.Emitter for testing.
 type mockEmitter struct {
@@ -57,7 +64,7 @@ func TestPipeline_New_NoIngestors(t *testing.T) {
 		},
 	}
 
-	_, err := New(cfg)
+	_, err := New(cfg, testLogger())
 	if err == nil {
 		t.Fatal("expected error when no ingestors enabled")
 	}
@@ -74,7 +81,7 @@ func TestPipeline_New_NoEmitters(t *testing.T) {
 		// All emitters disabled
 	}
 
-	_, err := New(cfg)
+	_, err := New(cfg, testLogger())
 	if err == nil {
 		t.Fatal("expected error when no emitters enabled")
 	}
@@ -93,7 +100,7 @@ func TestPipeline_IngestorCount(t *testing.T) {
 		},
 	}
 
-	p, err := New(cfg)
+	p, err := New(cfg, testLogger())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -116,7 +123,7 @@ func TestPipeline_EmitterCount(t *testing.T) {
 		},
 	}
 
-	p, err := New(cfg)
+	p, err := New(cfg, testLogger())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -143,7 +150,7 @@ func TestPipeline_MultipleIngestors(t *testing.T) {
 		},
 	}
 
-	p, err := New(cfg)
+	p, err := New(cfg, testLogger())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -171,7 +178,7 @@ func TestPipeline_MultipleEmitters(t *testing.T) {
 		},
 	}
 
-	p, err := New(cfg)
+	p, err := New(cfg, testLogger())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -206,7 +213,7 @@ func TestPipeline_BuildProcessorChain(t *testing.T) {
 		},
 	}
 
-	p, err := New(cfg)
+	p, err := New(cfg, testLogger())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}

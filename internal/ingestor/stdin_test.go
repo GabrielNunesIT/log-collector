@@ -15,7 +15,7 @@ func TestStdinIngestor(t *testing.T) {
 	reader := bytes.NewBufferString(input)
 
 	cfg := config.StdinIngestorConfig{Enabled: true}
-	ingestor := NewStdinIngestorWithReader(cfg, reader)
+	ingestor := NewStdinIngestorWithReader(cfg, reader, testLogger())
 
 	if ingestor.Name() != "stdin" {
 		t.Errorf("expected name 'stdin', got %q", ingestor.Name())
@@ -58,7 +58,7 @@ func TestStdinIngestor_EmptyLines(t *testing.T) {
 	reader := bytes.NewBufferString(input)
 
 	cfg := config.StdinIngestorConfig{Enabled: true}
-	ingestor := NewStdinIngestorWithReader(cfg, reader)
+	ingestor := NewStdinIngestorWithReader(cfg, reader, testLogger())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
